@@ -27,7 +27,7 @@ interface WorkflowState {
 }
 
 interface WorkflowContextType extends WorkflowState {
-  startAnalysis: (repoUrl: string) => Promise<void>
+  startAnalysis: (repoUrl: string, analysisMode?: string) => Promise<void>
   checkStatus: () => Promise<void>
   approve: (notes?: string) => Promise<void>
   reset: () => void
@@ -111,7 +111,7 @@ export function WorkflowProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const startAnalysis = useCallback(async (repoUrl: string) => {
+  const startAnalysis = useCallback(async (repoUrl: string, analysisMode: string = 'shallow') => {
     if (pollTimerRef.current) {
       clearTimeout(pollTimerRef.current)
     }
@@ -119,11 +119,11 @@ export function WorkflowProvider({ children }: { children: React.ReactNode }) {
     setState(prev => ({ ...prev, isAnalyzing: true, error: null, logs: [], results: null, status: null }))
     
     try {
-      const { workflow_id, status: workflowStatus } = await startWorkflow(repoUrl)
+      const { workflow_id, status: workflowStatus } = await startWorkflow(repoUrl, 'anonymous', analysisMode, 20)
       setState(prev => ({ 
         ...prev, 
         workflowId: workflow_id,
-        logs: [{ node: 'system', message: `Workflow started: ${workflowStatus}`, status: 'info' }]
+        logs: [{ node: 'system', message: `Workflow started: ${workflowStatus} (${analysisMode} mode)`, status: 'info' }]
       }))
       
       pollStatus(workflow_id)

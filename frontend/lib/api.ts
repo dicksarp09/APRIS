@@ -69,7 +69,12 @@ export interface AuditLogEntry {
   error_type?: string
 }
 
-export async function startWorkflow(repoUrl: string, userId: string = 'anonymous'): Promise<{ workflow_id: string; status: string }> {
+export async function startWorkflow(
+  repoUrl: string, 
+  userId: string = 'anonymous',
+  analysisMode: string = 'shallow',
+  maxFiles: number = 20
+): Promise<{ workflow_id: string; status: string }> {
   const response = await fetch(`${API_BASE}/workflow/start`, {
     method: 'POST',
     headers: {
@@ -79,6 +84,8 @@ export async function startWorkflow(repoUrl: string, userId: string = 'anonymous
     body: JSON.stringify({
       repo_url: repoUrl,
       mode: 'deterministic',
+      analysis_mode: analysisMode,
+      max_files_analyze: maxFiles,
     }),
   })
   

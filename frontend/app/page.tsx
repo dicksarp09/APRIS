@@ -9,12 +9,13 @@ import { ResultsPanel } from '@/components/ResultsPanel'
 
 function HomeContent() {
   const [repoUrl, setRepoUrl] = useState('')
+  const [analysisMode, setAnalysisMode] = useState('shallow')
   const { isAnalyzing, error, startAnalysis, status, approve, logs, reset } = useWorkflow()
 
   const handleAnalyze = useCallback(() => {
     if (!repoUrl) return
-    startAnalysis(repoUrl)
-  }, [repoUrl, startAnalysis])
+    startAnalysis(repoUrl, analysisMode)
+  }, [repoUrl, analysisMode, startAnalysis])
 
   const handleApprove = useCallback(() => {
     approve('Approved via UI')
@@ -126,6 +127,15 @@ function HomeContent() {
                 className="w-full pl-10 pr-4 py-3 bg-surface border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
               />
             </div>
+            <select
+              value={analysisMode}
+              onChange={(e) => setAnalysisMode(e.target.value)}
+              disabled={isAnalyzing}
+              className="px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="shallow">Fast (Shallow)</option>
+              <option value="deep">Deep Analysis</option>
+            </select>
             <button
               onClick={handleAnalyze}
               disabled={!repoUrl || isAnalyzing}
