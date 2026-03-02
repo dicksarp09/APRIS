@@ -57,7 +57,13 @@ class WorkflowService:
     async def _execute_workflow_async(self, workflow_id: str):
         try:
             engine = self._get_workflow_engine()
-            engine.run_workflow(workflow_id)
+            workflow_data = self._get_db().get_workflow_state(workflow_id)
+            if workflow_data:
+                state = json.loads(workflow_data.get("state_json", "{}"))
+                repo_url = state.get("repo_url", "")
+                engine.run_workflow(workflow_id, repo_url)
+            else:
+                engine.run_workflow(workflow_id, "")
         except Exception as e:
             state = self.get_workflow_state(workflow_id)
             if state:
