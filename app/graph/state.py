@@ -27,6 +27,10 @@ class WorkflowState(TypedDict):
     config_info: Dict[str, Any]
     primary_language: str
 
+    # Analysis configuration
+    analysis_mode: str  # "deep" or "shallow"
+    max_files_analyze: int  # Maximum files to analyze in deep mode
+
     short_term_memory: Dict[str, Any]
     failure_context: Dict[str, Any]
     applied_strategies: List[str]
@@ -84,6 +88,8 @@ def create_initial_state(workflow_id: str, repo_url: str) -> WorkflowState:
         "dependencies": {},
         "config_info": {},
         "primary_language": "",
+        "analysis_mode": "deep",  # "deep" or "shallow" - deep = analyze all files, shallow = metadata only
+        "max_files_analyze": 50,  # Maximum files to analyze in deep mode
         "short_term_memory": {
             "conversation_history": [],
             "analysis_results": {},

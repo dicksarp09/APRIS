@@ -11,6 +11,8 @@ router = APIRouter(prefix="/workflow", tags=["workflow"])
 class WorkflowStartRequest(BaseModel):
     repo_url: str
     mode: str = "deterministic"
+    analysis_mode: str = "deep"  # "deep" or "shallow"
+    max_files_analyze: int = 50  # Maximum files to analyze in deep mode
 
     @validator("repo_url")
     def validate_repo_url(cls, v):
@@ -22,6 +24,12 @@ class WorkflowStartRequest(BaseModel):
     def validate_mode(cls, v):
         if v not in ["deterministic", "adaptive"]:
             raise ValueError("Mode must be 'deterministic' or 'adaptive'")
+        return v
+
+    @validator("analysis_mode")
+    def validate_analysis_mode(cls, v):
+        if v not in ["deep", "shallow"]:
+            raise ValueError("Analysis mode must be 'deep' or 'shallow'")
         return v
 
 
@@ -65,7 +73,11 @@ async def start_workflow(
         )
 
     result = service.start_workflow(
-        repo_url=request.repo_url, user_id=user_id, mode=request.mode
+        repo_url=request.repo_url,
+        user_id=user_id,
+        mode=request.mode,
+        analysis_mode=request.analysis_mode,
+        max_files_analyze=request.max_files_analyze,
     )
 
     return WorkflowResponse(**result)

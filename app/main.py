@@ -31,6 +31,11 @@ async def startup_event():
     except:
         pass
 
+    try:
+        rbac.create_user("anonymous", "operator")
+    except:
+        pass
+
 
 app.include_router(workflow_router)
 

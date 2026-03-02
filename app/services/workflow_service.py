@@ -25,7 +25,12 @@ class WorkflowService:
         return self._workflow_engine
 
     def start_workflow(
-        self, repo_url: str, user_id: str, mode: str = "deterministic"
+        self,
+        repo_url: str,
+        user_id: str,
+        mode: str = "deterministic",
+        analysis_mode: str = "deep",
+        max_files_analyze: int = 50,
     ) -> Dict[str, Any]:
         workflow_id = str(uuid.uuid4())
 
@@ -33,6 +38,8 @@ class WorkflowService:
         initial_state["status"] = "started"
         initial_state["user_id"] = user_id
         initial_state["mode"] = mode
+        initial_state["analysis_mode"] = analysis_mode  # "deep" or "shallow"
+        initial_state["max_files_analyze"] = max_files_analyze  # Max files to analyze
 
         state_json = json.dumps(initial_state)
 

@@ -265,6 +265,8 @@ class ParseFilesNode(SandboxableNode):
         file_index = state.get("file_index", [])
         repo_metadata = state.get("repo_metadata", {})
         repo_path = repo_metadata.get("local_path")
+        analysis_mode = state.get("analysis_mode", "deep")
+        max_files = state.get("max_files_analyze", 50)
 
         if not repo_path:
             return NodeResult(
@@ -276,16 +278,34 @@ class ParseFilesNode(SandboxableNode):
 
         try:
             parsed = {}
-            for filepath in sorted(file_index):
+            
+            # In shallow mode, only get file metadata without reading content
+            # In deep mode, read all files
+            files_to_parse = file_index if analysis_mode == "deep" else file_index[:max_files]
+            
+            for filepath in sorted(files_to_parse):
                 full_path = os.path.join(repo_path, filepath)
                 if os.path.isfile(full_path):
-                    parsed[filepath] = self._parse_file(full_path)
+                    if analysis_mode == "shallow":
+                        # Shallow mode: only get file stats, don't read content
+                        parsed[filepath] = self._parse_file_shallow(full_path)
+                    else:
+                        # Deep mode: read file content
+                        parsed[filepath] = self._parse_file(full_path)
+
+            # Add analysis info to metadata
+            parse_info = {
+                "analysis_mode": analysis_mode,
+                "files_parsed": len(parsed),
+                "total_files": len(file_index),
+                "truncated": analysis_mode == "shallow" and len(file_index) > max_files
+            }
 
             return NodeResult(
                 status="success",
                 confidence=0.9,
                 retryable=False,
-                updates={"repo_metadata": {**repo_metadata, "parsed_files": parsed}},
+                updates={"repo_metadata": {**repo_metadata, "parsed_files": parsed, "parse_info": parse_info}},
             )
         except Exception as e:
             return NodeResult(
@@ -294,6 +314,20 @@ class ParseFilesNode(SandboxableNode):
                 error_type="parse_error",
                 retryable=True,
             )
+
+    def _parse_file_shallow(self, filepath: str) -> dict:
+        """Shallow parsing - only get file stats without reading content."""
+        try:
+            stat = os.stat(filepath)
+            ext = os.path.splitext(filepath)[1]
+            return {
+                "extension": ext,
+                "size": stat.st_size,
+                "parseable": True,
+                "shallow": True,  # Mark as shallow parse
+            }
+        except Exception:
+            return {"extension": "", "parseable": False, "shallow": True}
 
     def _parse_file(self, filepath: str) -> dict:
         ext = os.path.splitext(filepath)[1]
@@ -322,30 +356,87 @@ class SummarizeFilesNode(BaseNode):
         parsed_files = repo_metadata.get("parsed_files", {})
         file_index = state.get("file_index", [])
         repo_path = repo_metadata.get("local_path", "")
+        analysis_mode = state.get("analysis_mode", "deep")
+        max_files = state.get("max_files_analyze", 50)
 
         summaries = {}
         file_contents = {}
 
-        for filepath in sorted(file_index):
+        # In shallow mode, only summarize key files (readme, config) up to max_files
+        # In deep mode, summarize all files
+        if analysis_mode == "shallow":
+            # Prioritize important files in shallow mode
+            files_to_summarize = self._prioritize_files(file_index, max_files)
+        else:
+            files_to_summarize = file_index
+
+        for filepath in sorted(files_to_summarize):
             if filepath in parsed_files:
                 parsed = parsed_files[filepath]
-                summary, content = self._summarize(filepath, parsed, repo_path)
+                summary, content = self._summarize(filepath, parsed, repo_path, analysis_mode)
                 summaries[filepath] = summary
-                if content:
+                if content and analysis_mode == "deep":
+                    # Only store content in deep mode to save memory
                     file_contents[filepath] = content
+
+        # Add summary info
+        summary_info = {
+            "analysis_mode": analysis_mode,
+            "files_summarized": len(summaries),
+            "total_files": len(file_index),
+        }
 
         return NodeResult(
             status="success",
             confidence=0.8,
             retryable=False,
-            updates={"summaries": summaries, "file_contents": file_contents},
+            updates={"summaries": summaries, "file_contents": file_contents, "summary_info": summary_info},
         )
 
-    def _summarize(self, filepath: str, parsed: dict, repo_path: str) -> tuple:
+    def _prioritize_files(self, file_index: list, max_files: int) -> list:
+        """Prioritize important files for shallow analysis."""
+        prioritized = []
+        
+        # First: README files
+        for f in file_index:
+            if "readme" in f.lower():
+                prioritized.append(f)
+        
+        # Second: Config files
+        config_patterns = ["package.json", "requirements.txt", "pyproject.toml", "Cargo.toml", 
+                         "go.mod", "pom.xml", "build.gradle", "Makefile", "Dockerfile",
+                         ".env", "tsconfig.json", "webpack.config", "vite.config"]
+        for f in file_index:
+            if any(f.endswith(p) or p in f for p in config_patterns) and f not in prioritized:
+                prioritized.append(f)
+        
+        # Third: Entry point files (main, app, index)
+        entry_patterns = ["main.", "index.", "app.", "server."]
+        for f in file_index:
+            if any(f.startswith(p) for p in entry_patterns) and f not in prioritized:
+                prioritized.append(f)
+        
+        # Add remaining files up to max_files
+        for f in file_index:
+            if f not in prioritized and len(prioritized) < max_files:
+                prioritized.append(f)
+        
+        return prioritized[:max_files]
+
+    def _summarize(self, filepath: str, parsed: dict, repo_path: str, analysis_mode: str = "deep") -> tuple:
         ext = parsed.get("extension", "")
         lines = parsed.get("lines", 0)
         size = parsed.get("size", 0)
 
+        basic_info = f"{filepath}: {ext} file"
+        
+        # In shallow mode, skip reading file content - just use metadata
+        if analysis_mode == "shallow":
+            if lines > 0:
+                basic_info += f", {lines} lines, {size} bytes"
+            return (basic_info, "")
+        
+        # Deep mode: read and analyze content
         content = ""
         if ext in [
             ".py",
@@ -855,40 +946,70 @@ class ContentAnalysisNode(BaseNode):
         # Extract configuration info
         config_info = self._analyze_configs(config_files)
 
-        # Try LLM-powered summary if available
+        # Try LLM-powered summary if available (only in deep mode)
         llm_summary = ""
-        try:
-            from app.agents.analysis_agent import get_analysis_agent
+        analysis_mode = state.get("analysis_mode", "deep")
+        
+        if analysis_mode == "shallow":
+            # In shallow mode, skip LLM calls and use heuristic-based analysis
+            try:
+                # Generate basic description from metadata
+                repo_name = state.get("repo_url", "").split("/")[-1].replace(".git", "")
+                primary_lang = state.get("primary_language", "")
+                file_count = len(file_index)
+                
+                # Build basic description
+                basic_desc = f"Repository: {repo_name}\n"
+                if primary_lang:
+                    basic_desc += f"Primary Language: {primary_lang}\n"
+                basic_desc += f"File Count: {file_count}\n"
+                basic_desc += f"Analysis Mode: Shallow (metadata only)\n"
+                
+                # Add key config files info
+                if config_files:
+                    basic_desc += f"Config Files: {', '.join(list(config_files.keys())[:5])}\n"
+                if requirements:
+                    basic_desc += f"Dependencies: {', '.join(list(requirements.keys())[:5])}\n"
+                
+                llm_summary = basic_desc
+                project_description["llm_summary"] = llm_summary
+                project_description["analysis_mode"] = "shallow"
+            except Exception:
+                pass
+        else:
+            # Deep mode: use LLM for detailed analysis
+            try:
+                from app.agents.analysis_agent import get_analysis_agent
 
-            agent = get_analysis_agent()
-            repo_name = state.get("repo_url", "").split("/")[-1].replace(".git", "")
-            purpose = project_description.get("purpose", "Unknown")
-            features = ", ".join(project_description.get("key_features", [])[:5])
-            deps = ", ".join(
-                dependencies.get("python", [])[:5]
-                + dependencies.get("javascript", [])[:5]
-            )
-            config = ", ".join(
-                config_info.get("docker", []) + config_info.get("cloud", [])
-            )
+                agent = get_analysis_agent()
+                repo_name = state.get("repo_url", "").split("/")[-1].replace(".git", "")
+                purpose = project_description.get("purpose", "Unknown")
+                features = ", ".join(project_description.get("key_features", [])[:5])
+                deps = ", ".join(
+                    dependencies.get("python", [])[:5]
+                    + dependencies.get("javascript", [])[:5]
+                )
+                config = ", ".join(
+                    config_info.get("docker", []) + config_info.get("cloud", [])
+                )
 
-            result = agent.run_analysis(
-                "repo_summary",
-                {
-                    "repo_name": repo_name,
-                    "primary_language": primary_lang,
-                    "file_count": str(len(file_index)),
-                    "purpose": purpose,
-                    "features": features,
-                    "dependencies": deps,
-                    "config": config,
-                },
-                state,
-            )
-            if result.get("status") == "success":
-                llm_summary = result.get("analysis", "")
-        except Exception:
-            pass
+                result = agent.run_analysis(
+                    "repo_summary",
+                    {
+                        "repo_name": repo_name,
+                        "primary_language": primary_lang,
+                        "file_count": str(len(file_index)),
+                        "purpose": purpose,
+                        "features": features,
+                        "dependencies": deps,
+                        "config": config,
+                    },
+                    state,
+                )
+                if result.get("status") == "success":
+                    llm_summary = result.get("analysis", "")
+            except Exception:
+                pass
 
         if llm_summary:
             project_description["llm_summary"] = llm_summary
