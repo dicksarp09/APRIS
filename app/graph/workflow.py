@@ -146,13 +146,17 @@ class WorkflowEngine:
 
     def run_workflow(self, workflow_id: str, repo_url: str) -> WorkflowState:
         db = get_database()
-        initial_state = create_initial_state(workflow_id, repo_url)
+        workflow_data = db.get_workflow_state(workflow_id)
 
-        db.create_workflow(
-            workflow_id=workflow_id,
-            repo_url=repo_url,
-            state_json=json.dumps(initial_state),
-        )
+        if workflow_data:
+            initial_state = json.loads(workflow_data.get("state_json", "{}"))
+        else:
+            initial_state = create_initial_state(workflow_id, repo_url)
+            db.create_workflow(
+                workflow_id=workflow_id,
+                repo_url=repo_url,
+                state_json=json.dumps(initial_state),
+            )
 
         result = self.graph.invoke(initial_state)
         return result
