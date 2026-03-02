@@ -146,6 +146,8 @@ class WorkflowService:
         if not state:
             return None
 
+        architecture_analysis = self._get_architecture_analysis(state)
+
         return {
             "architecture_summary": state.get("architecture_summary", ""),
             "documentation": state.get("documentation", ""),
@@ -153,7 +155,20 @@ class WorkflowService:
             "classification": state.get("classification", ""),
             "file_count": len(state.get("file_index", [])),
             "confidence": state.get("confidence", 0.0),
+            "primary_language": state.get("primary_language", ""),
+            "architecture_score": architecture_analysis.get("architecture_score", 0.0),
+            "maturity_score": architecture_analysis.get("maturity_score", {}),
+            "complexity_profile": architecture_analysis.get("complexity_profile", {}),
+            "risk_profile": architecture_analysis.get("risk_profile", {}),
         }
+
+    def _get_architecture_analysis(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            from app.nodes.advanced_analysis import analyze_architecture
+
+            return analyze_architecture(state)
+        except Exception as e:
+            return {"error": str(e)}
 
     def validate_repo_access(self, repo_url: str) -> Dict[str, Any]:
         import requests
