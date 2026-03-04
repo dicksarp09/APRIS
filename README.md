@@ -1,6 +1,6 @@
 # APRIS - Autonomous Public Repository Intelligence System
 
-An AI-powered agent that analyzes GitHub repositories and provides decision-oriented summaries in seconds. Reduces code review time by ~98%.
+An AI-powered agent that analyzes GitHub repositories and provides decision-oriented summaries in seconds. Reduces code review time by ~80%.
 
 ## Project Description
 
