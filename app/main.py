@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from app.api.workflow import router as workflow_router
 from app.security.rbac import get_rbac_enforcer
+import time
 
 
 app = FastAPI(
@@ -17,6 +19,41 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Prometheus metrics middleware
+class MetricsMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start_time = time.time()
+
+        response = await call_next(request)
+
+        duration = time.time() - start_time
+
+        # Record metrics
+        try:
+            from app.observability.prometheus_metrics import (
+                http_requests_total,
+                request_latency_seconds,
+                get_metrics_middleware,
+            )
+
+            http_requests_total.labels(
+                method=request.method,
+                endpoint=request.url.path,
+                status=str(response.status_code),
+            ).inc()
+
+            request_latency_seconds.labels(
+                method=request.method, endpoint=request.url.path
+            ).observe(duration)
+        except Exception:
+            pass
+
+        return response
+
+
+app.add_middleware(MetricsMiddleware)
 
 
 @app.on_event("startup")
@@ -38,6 +75,11 @@ async def startup_event():
 
 
 app.include_router(workflow_router)
+
+# Add metrics router
+from app.observability.prometheus_metrics import router as metrics_router
+
+app.include_router(metrics_router)
 
 
 @app.get("/health")
