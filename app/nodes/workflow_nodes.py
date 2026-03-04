@@ -278,11 +278,13 @@ class ParseFilesNode(SandboxableNode):
 
         try:
             parsed = {}
-            
+
             # In shallow mode, only get file metadata without reading content
             # In deep mode, read all files
-            files_to_parse = file_index if analysis_mode == "deep" else file_index[:max_files]
-            
+            files_to_parse = (
+                file_index if analysis_mode == "deep" else file_index[:max_files]
+            )
+
             for filepath in sorted(files_to_parse):
                 full_path = os.path.join(repo_path, filepath)
                 if os.path.isfile(full_path):
@@ -298,14 +300,20 @@ class ParseFilesNode(SandboxableNode):
                 "analysis_mode": analysis_mode,
                 "files_parsed": len(parsed),
                 "total_files": len(file_index),
-                "truncated": analysis_mode == "shallow" and len(file_index) > max_files
+                "truncated": analysis_mode == "shallow" and len(file_index) > max_files,
             }
 
             return NodeResult(
                 status="success",
                 confidence=0.9,
                 retryable=False,
-                updates={"repo_metadata": {**repo_metadata, "parsed_files": parsed, "parse_info": parse_info}},
+                updates={
+                    "repo_metadata": {
+                        **repo_metadata,
+                        "parsed_files": parsed,
+                        "parse_info": parse_info,
+                    }
+                },
             )
         except Exception as e:
             return NodeResult(
@@ -373,7 +381,9 @@ class SummarizeFilesNode(BaseNode):
         for filepath in sorted(files_to_summarize):
             if filepath in parsed_files:
                 parsed = parsed_files[filepath]
-                summary, content = self._summarize(filepath, parsed, repo_path, analysis_mode)
+                summary, content = self._summarize(
+                    filepath, parsed, repo_path, analysis_mode
+                )
                 summaries[filepath] = summary
                 if content and analysis_mode == "deep":
                     # Only store content in deep mode to save memory
@@ -390,52 +400,73 @@ class SummarizeFilesNode(BaseNode):
             status="success",
             confidence=0.8,
             retryable=False,
-            updates={"summaries": summaries, "file_contents": file_contents, "summary_info": summary_info},
+            updates={
+                "summaries": summaries,
+                "file_contents": file_contents,
+                "summary_info": summary_info,
+            },
         )
 
     def _prioritize_files(self, file_index: list, max_files: int) -> list:
         """Prioritize important files for shallow analysis."""
         prioritized = []
-        
+
         # First: README files
         for f in file_index:
             if "readme" in f.lower():
                 prioritized.append(f)
-        
+
         # Second: Config files
-        config_patterns = ["package.json", "requirements.txt", "pyproject.toml", "Cargo.toml", 
-                         "go.mod", "pom.xml", "build.gradle", "Makefile", "Dockerfile",
-                         ".env", "tsconfig.json", "webpack.config", "vite.config"]
+        config_patterns = [
+            "package.json",
+            "requirements.txt",
+            "pyproject.toml",
+            "Cargo.toml",
+            "go.mod",
+            "pom.xml",
+            "build.gradle",
+            "Makefile",
+            "Dockerfile",
+            ".env",
+            "tsconfig.json",
+            "webpack.config",
+            "vite.config",
+        ]
         for f in file_index:
-            if any(f.endswith(p) or p in f for p in config_patterns) and f not in prioritized:
+            if (
+                any(f.endswith(p) or p in f for p in config_patterns)
+                and f not in prioritized
+            ):
                 prioritized.append(f)
-        
+
         # Third: Entry point files (main, app, index)
         entry_patterns = ["main.", "index.", "app.", "server."]
         for f in file_index:
             if any(f.startswith(p) for p in entry_patterns) and f not in prioritized:
                 prioritized.append(f)
-        
+
         # Add remaining files up to max_files
         for f in file_index:
             if f not in prioritized and len(prioritized) < max_files:
                 prioritized.append(f)
-        
+
         return prioritized[:max_files]
 
-    def _summarize(self, filepath: str, parsed: dict, repo_path: str, analysis_mode: str = "deep") -> tuple:
+    def _summarize(
+        self, filepath: str, parsed: dict, repo_path: str, analysis_mode: str = "deep"
+    ) -> tuple:
         ext = parsed.get("extension", "")
         lines = parsed.get("lines", 0)
         size = parsed.get("size", 0)
 
         basic_info = f"{filepath}: {ext} file"
-        
+
         # In shallow mode, skip reading file content - just use metadata
         if analysis_mode == "shallow":
             if lines > 0:
                 basic_info += f", {lines} lines, {size} bytes"
             return (basic_info, "")
-        
+
         # Deep mode: read and analyze content
         content = ""
         if ext in [
@@ -949,7 +980,7 @@ class ContentAnalysisNode(BaseNode):
         # Try LLM-powered summary if available (only in deep mode)
         llm_summary = ""
         analysis_mode = state.get("analysis_mode", "deep")
-        
+
         if analysis_mode == "shallow":
             # In shallow mode, skip LLM calls and use heuristic-based analysis
             try:
@@ -957,20 +988,24 @@ class ContentAnalysisNode(BaseNode):
                 repo_name = state.get("repo_url", "").split("/")[-1].replace(".git", "")
                 primary_lang = state.get("primary_language", "")
                 file_count = len(file_index)
-                
+
                 # Build basic description
                 basic_desc = f"Repository: {repo_name}\n"
                 if primary_lang:
                     basic_desc += f"Primary Language: {primary_lang}\n"
                 basic_desc += f"File Count: {file_count}\n"
                 basic_desc += f"Analysis Mode: Shallow (metadata only)\n"
-                
+
                 # Add key config files info
                 if config_files:
-                    basic_desc += f"Config Files: {', '.join(list(config_files.keys())[:5])}\n"
+                    basic_desc += (
+                        f"Config Files: {', '.join(list(config_files.keys())[:5])}\n"
+                    )
                 if requirements:
-                    basic_desc += f"Dependencies: {', '.join(list(requirements.keys())[:5])}\n"
-                
+                    basic_desc += (
+                        f"Dependencies: {', '.join(list(requirements.keys())[:5])}\n"
+                    )
+
                 llm_summary = basic_desc
                 project_description["llm_summary"] = llm_summary
                 project_description["analysis_mode"] = "shallow"
@@ -1946,7 +1981,17 @@ class DocumentationGenerationNode(BaseNode):
                 doc += "## Key Features\n\n"
                 for feature in features[:8]:
                     clean = feature.strip().lstrip("-•*").strip()
-                    if len(clean) > 5:
+                    # Format: "- **Feature Name**: Description" or "- Feature description"
+                    if ":" in clean and len(clean) > 10:
+                        # Has a colon - split and format nicely
+                        parts = clean.split(":", 1)
+                        key = parts[0].strip()
+                        val = parts[1].strip() if len(parts) > 1 else ""
+                        if key and val:
+                            doc += f"- **{key}**: {val}\n"
+                        elif key:
+                            doc += f"- {key}\n"
+                    elif len(clean) > 5:
                         doc += f"- {clean}\n"
                 doc += "\n"
 
