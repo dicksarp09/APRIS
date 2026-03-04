@@ -4,13 +4,12 @@ import { motion } from 'framer-motion'
 import { useWorkflow } from '@/context/WorkflowContext'
 import { 
   FileText, GitBranch, Package, CheckCircle, AlertTriangle, XCircle, 
-  Layers, Activity, ChevronDown, ChevronRight, Copy, Check 
+  Layers, Activity, Copy, Check 
 } from 'lucide-react'
 import { useState } from 'react'
 
 export function ResultsPanel() {
   const { results, status } = useWorkflow()
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['overview', 'features', 'tech', 'risk', 'complexity', 'files']))
 
   if (!results || status?.status !== 'completed') {
     return null
@@ -21,145 +20,155 @@ export function ResultsPanel() {
   const complexity = results.complexity_profile || {}
   const risk = results.risk_profile || {}
 
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev)
-      if (next.has(section)) {
-        next.delete(section)
-      } else {
-        next.add(section)
-      }
-      return next
-    })
-  }
-
   const doc = results.documentation || results.architecture_summary || ''
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Header Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-border">
+    <div className="flex h-full">
+      {/* Main Documentation Area */}
+      <div className="flex-1 p-4 overflow-hidden">
+        {doc && (
+          <DocumentationRenderer content={doc} />
+        )}
+      </div>
+
+      {/* Right Sidebar - Quick Stats */}
+      <div className="w-72 bg-white border-l border-border overflow-y-auto p-4 space-y-4">
+        {/* Classification */}
+        <div className="bg-gray-50 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-1">
-            <GitBranch className="w-4 h-4 text-primary" />
+            <GitBranch className="w-3.5 h-3.5 text-primary" />
             <span className="text-xs font-medium text-gray-500">Classification</span>
           </div>
-          <div className="text-xl font-bold text-primary">{results.classification}</div>
+          <div className="text-lg font-bold text-primary">{results.classification}</div>
           <div className="text-xs text-gray-400">{results.primary_language}</div>
         </div>
 
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-border">
+        {/* Files */}
+        <div className="bg-gray-50 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-1">
-            <Package className="w-4 h-4 text-primary" />
+            <Package className="w-3.5 h-3.5 text-primary" />
             <span className="text-xs font-medium text-gray-500">Files</span>
           </div>
-          <div className="text-xl font-bold">{results.file_count}</div>
+          <div className="text-lg font-bold">{results.file_count}</div>
           <div className="text-xs text-gray-400">analyzed</div>
         </div>
 
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-border">
+        {/* Architecture */}
+        <div className="bg-gray-50 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-1">
-            <Activity className="w-4 h-4 text-primary" />
+            <Activity className="w-3.5 h-3.5 text-primary" />
             <span className="text-xs font-medium text-gray-500">Architecture</span>
           </div>
-          <div className="text-xl font-bold">{results.architecture_score.toFixed(1)}</div>
+          <div className="text-lg font-bold">{results.architecture_score.toFixed(1)}</div>
           <div className="text-xs text-gray-400">/ 10</div>
         </div>
 
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-border">
+        {/* Maturity */}
+        <div className="bg-gray-50 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-1">
-            <Layers className="w-4 h-4 text-primary" />
+            <Layers className="w-3.5 h-3.5 text-primary" />
             <span className="text-xs font-medium text-gray-500">Maturity</span>
           </div>
-          <div className="text-xl font-bold">{maturity.score?.toFixed(1) || 'N/A'}</div>
+          <div className="text-lg font-bold">{maturity.score?.toFixed(1) || 'N/A'}</div>
           <div className="text-xs text-gray-400">{maturity.verdict || ''}</div>
         </div>
-      </div>
 
-      {/* Risk Profile */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-border">
-        <h3 className="font-semibold mb-3 flex items-center gap-2 text-gray-800">
-          <AlertTriangle className="w-4 h-4 text-amber-500" />
-          Risk Profile
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <RiskBadge label="Cost" value={risk.cost_risk} />
-          <RiskBadge label="Latency" value={risk.latency_risk} />
-          <RiskBadge label="Scalability" value={risk.scalability_risk} />
-          <RiskBadge label="Complexity" value={risk.complexity_risk} />
+        {/* Risk Profile */}
+        <div className="bg-gray-50 rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+            <span className="text-xs font-medium text-gray-500">Risk Profile</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <RiskBadge label="Cost" value={risk.cost_risk} />
+            <RiskBadge label="Latency" value={risk.latency_risk} />
+            <RiskBadge label="Scalability" value={risk.scalability_risk} />
+            <RiskBadge label="Complexity" value={risk.complexity_risk} />
+          </div>
         </div>
-      </div>
 
-      {/* Complexity */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-border">
-        <h3 className="font-semibold mb-3 flex items-center gap-2 text-gray-800">
-          <Activity className="w-4 h-4 text-primary" />
-          Code Complexity
-        </h3>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-gray-3 rounded-lg-50 p">
-            <div className="text-xs font-medium text-gray-500">Average</div>
-            <div className="text-2xl font-bold text-gray-800">{complexity.avg_complexity?.toFixed(1) || 'N/A'}</div>
+        {/* Code Complexity */}
+        <div className="bg-gray-50 rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Activity className="w-3.5 h-3.5 text-primary" />
+            <span className="text-xs font-medium text-gray-500">Code Complexity</span>
           </div>
-          <div className="bg-gray-50 p-3 rounded-lg">
-            <div className="text-xs font-medium text-gray-500">Maximum</div>
-            <div className="text-2xl font-bold text-gray-800">{complexity.max_complexity || 'N/A'}</div>
-          </div>
-          <div className="bg-gray-50 p-3 rounded-lg">
-            <div className="text-xs font-medium text-gray-500">Risk Level</div>
-            <div className={`text-2xl font-bold ${
-              complexity.risk_level === 'critical' ? 'text-red-600' :
-              complexity.risk_level === 'high' ? 'text-orange-500' :
-              complexity.risk_level === 'moderate' ? 'text-amber-500' : 'text-green-500'
-            }`}>
-              {complexity.risk_level || 'N/A'}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div>
+              <div className="text-xs text-gray-400">Avg</div>
+              <div className="font-bold text-gray-800">{complexity.avg_complexity?.toFixed(1) || 'N/A'}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-400">Max</div>
+              <div className="font-bold text-gray-800">{complexity.max_complexity || 'N/A'}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-400">Risk</div>
+              <div className={`font-bold text-xs ${
+                complexity.risk_level === 'critical' ? 'text-red-600' :
+                complexity.risk_level === 'high' ? 'text-orange-500' :
+                complexity.risk_level === 'moderate' ? 'text-amber-500' : 'text-green-500'
+              }`}>
+                {complexity.risk_level || 'N/A'}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Dependencies */}
-      {depGraph.external_packages && depGraph.external_packages.length > 0 && (
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-border">
-          <h3 className="font-semibold mb-3 flex items-center gap-2 text-gray-800">
-            <Package className="w-4 h-4 text-primary" />
-            Dependencies ({depGraph.external_packages.length})
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {depGraph.external_packages.slice(0, 20).map((pkg, i) => (
-              <span key={i} className="bg-gray-100 text-gray-700 text-xs px-3 py-1.5 rounded-full font-medium">
-                {pkg}
-              </span>
-            ))}
-            {depGraph.external_packages.length > 20 && (
-              <span className="text-xs text-gray-500">+{depGraph.external_packages.length - 20} more</span>
+        {/* Dependencies */}
+        {depGraph.external_packages && depGraph.external_packages.length > 0 && (
+          <div className="bg-gray-50 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Package className="w-3.5 h-3.5 text-primary" />
+              <span className="text-xs font-medium text-gray-500">Dependencies ({depGraph.external_packages.length})</span>
+            </div>
+            <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+              {depGraph.external_packages.slice(0, 20).map((pkg, i) => (
+                <span key={i} className="bg-white text-gray-600 text-xs px-2 py-0.5 rounded border border-gray-200">
+                  {pkg}
+                </span>
+              ))}
+              {depGraph.external_packages.length > 20 && (
+                <span className="text-xs text-gray-400">+{depGraph.external_packages.length - 20} more</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Dependency Issues */}
+        {(depGraph.has_cycles || (depGraph.layer_violations && depGraph.layer_violations.length > 0)) && (
+          <div className="bg-red-50 rounded-lg p-3 border border-red-200">
+            <div className="flex items-center gap-2 mb-2">
+              <XCircle className="w-3.5 h-3.5 text-red-500" />
+              <span className="text-xs font-medium text-red-700">Issues</span>
+            </div>
+            {depGraph.has_cycles && (
+              <div className="text-xs text-red-600">Circular dependencies</div>
+            )}
+            {depGraph.layer_violations && depGraph.layer_violations.length > 0 && (
+              <div className="text-xs text-red-600">{depGraph.layer_violations.length} layer violations</div>
             )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Documentation - Rendered Properly */}
-      {doc && (
-        <DocumentationRenderer content={doc} />
-      )}
-
-      {/* Maturity Factors */}
-      {maturity.factors && maturity.factors.length > 0 && (
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-border">
-          <h3 className="font-semibold mb-3 flex items-center gap-2 text-gray-800">
-            <CheckCircle className="w-4 h-4 text-green-500" />
-            Maturity Factors
-          </h3>
-          <div className="space-y-2">
-            {maturity.factors.map((factor, i) => (
-              <div key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                <span>{factor.replace(/[+()]/g, '').trim()}</span>
-              </div>
-            ))}
+        {/* Maturity Factors */}
+        {maturity.factors && maturity.factors.length > 0 && (
+          <div className="bg-gray-50 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+              <span className="text-xs font-medium text-gray-500">Maturity Factors</span>
+            </div>
+            <div className="space-y-1 max-h-24 overflow-y-auto">
+              {maturity.factors.slice(0, 5).map((factor, i) => (
+                <div key={i} className="text-xs text-gray-600 flex items-start gap-1">
+                  <CheckCircle className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>{factor.replace(/[+()]/g, '').trim()}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
@@ -204,7 +213,6 @@ function DocumentationRenderer({ content }: { content: string }) {
     }
 
     const formatInline = (text: string): JSX.Element => {
-      // Bold **text**
       const parts = text.split(/(\*\*[^*]+\*\*)/g)
       return (
         <>
@@ -226,7 +234,6 @@ function DocumentationRenderer({ content }: { content: string }) {
         continue
       }
 
-      // Headers
       if (line.startsWith('## ')) {
         flushList()
         elements.push(
@@ -248,10 +255,7 @@ function DocumentationRenderer({ content }: { content: string }) {
             {line.slice(2)}
           </h1>
         )
-      } 
-      // List items
-      else if (line.startsWith('- ') || line.startsWith('* ')) {
-        flushList()
+      } else if (line.startsWith('- ') || line.startsWith('* ')) {
         if (listType !== 'ul') {
           flushList()
           listType = 'ul'
@@ -259,14 +263,12 @@ function DocumentationRenderer({ content }: { content: string }) {
         currentList.push(line.slice(2))
       }
       else if (/^\d+\.\s/.test(line)) {
-        flushList()
         if (listType !== 'ol') {
           flushList()
           listType = 'ol'
         }
         currentList.push(line.replace(/^\d+\.\s/, ''))
       }
-      // Blockquotes (>)
       else if (line.startsWith('> ')) {
         flushList()
         elements.push(
@@ -275,7 +277,6 @@ function DocumentationRenderer({ content }: { content: string }) {
           </blockquote>
         )
       }
-      // Regular paragraph
       else {
         flushList()
         elements.push(
@@ -291,11 +292,11 @@ function DocumentationRenderer({ content }: { content: string }) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-border h-full flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
         <h3 className="font-semibold flex items-center gap-2 text-gray-800">
           <FileText className="w-4 h-4 text-primary" />
-          Full Documentation
+          Documentation
         </h3>
         <button
           onClick={copyToClipboard}
@@ -305,7 +306,7 @@ function DocumentationRenderer({ content }: { content: string }) {
           {copied ? 'Copied!' : 'Copy'}
         </button>
       </div>
-      <div className="p-4 max-h-[500px] overflow-y-auto">
+      <div className="p-4 flex-1 overflow-y-auto">
         {renderContent()}
       </div>
     </div>
@@ -322,9 +323,9 @@ function RiskBadge({ label, value }: { label: string; value: string }) {
   const colorClass = colors[value] || 'bg-gray-100 text-gray-700'
 
   return (
-    <div className="text-center p-2 bg-gray-50 rounded-lg">
-      <div className="text-xs font-medium text-gray-500 mb-1">{label}</div>
-      <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold capitalize ${colorClass}`}>
+    <div className="text-center">
+      <div className="text-[10px] text-gray-400">{label}</div>
+      <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold capitalize ${colorClass}`}>
         {value}
       </span>
     </div>
