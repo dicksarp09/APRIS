@@ -24,9 +24,9 @@ env/
 htmlcov/
 
 # Node/Frontend
-frontend/node_modules
-frontend/.next
-frontend/.gitignore
+frontend/
+node_modules/
+.next/
 
 # Docs & Plans
 plans/
@@ -36,6 +36,7 @@ plans/
 # Database
 *.db
 *.sqlite
+*.sqlite3
 
 # Environment
 .env
@@ -50,3 +51,8 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+
+# Data
+chroma_data/
+.cache/
+.models/
