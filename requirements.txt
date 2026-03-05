@@ -1,8 +1,8 @@
 fastapi>=0.100.0
-uvicorn>=0.23.0
+uvicorn[standard]>=0.23.0
 langgraph>=0.0.20
 pydantic>=2.0.0
-python-multipart>=0.6.0
+python-multipart==0.0.9
 redis>=4.5.0
 chromadb>=0.4.0
 sentence-transformers>=2.2.0
