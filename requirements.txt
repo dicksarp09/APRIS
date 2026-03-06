@@ -1,11 +1,16 @@
+# Core requirements - always installed
 fastapi>=0.100.0
 uvicorn[standard]>=0.23.0
 langgraph>=0.0.20
 pydantic>=2.0.0
 python-multipart==0.0.9
 redis>=4.5.0
-chromadb>=0.4.0
-sentence-transformers>=2.2.0
 groq>=0.4.0
 requests>=2.31.0
 prometheus-client>=0.19.0
+mcp>=1.0.0
+
+# Optional - for vector search and embeddings (heavy, ~2GB)
+# Install with: pip install -r requirements-optional.txt
+# chromadb>=0.4.0
+# sentence-transformers>=2.2.0

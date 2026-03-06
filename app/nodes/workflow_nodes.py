@@ -21,6 +21,28 @@ class CloneRepoNode(SandboxableNode):
                 retryable=False,
             )
 
+        # Get the repository provider type from state
+        provider_type = state.get("repository_provider", "github_mcp")
+
+        try:
+            if provider_type == "local":
+                return self._clone_locally(repo_url, state)
+            else:
+                return self._use_github_mcp(repo_url, state)
+
+        except Exception as e:
+            return NodeResult(
+                status="failure",
+                confidence=0.0,
+                error_type="execution_error",
+                retryable=True,
+                updates={
+                    "error_state": {"error_type": "execution_error", "message": str(e)}
+                },
+            )
+
+    def _clone_locally(self, repo_url: str, state: WorkflowState) -> NodeResult:
+        """Clone repository using local git."""
         try:
             import uuid
 
@@ -60,7 +82,11 @@ class CloneRepoNode(SandboxableNode):
 
             updates = {
                 "file_index": sorted(files),
-                "repo_metadata": {"local_path": repo_path, "clone_success": True},
+                "repo_metadata": {
+                    "local_path": repo_path,
+                    "clone_success": True,
+                    "provider": "local",
+                },
             }
             return NodeResult(
                 status="success", confidence=1.0, retryable=False, updates=updates
@@ -77,6 +103,89 @@ class CloneRepoNode(SandboxableNode):
                 retryable=True,
                 updates={
                     "error_state": {"error_type": "execution_error", "message": str(e)}
+                },
+            )
+
+    def _use_github_mcp(self, repo_url: str, state: WorkflowState) -> NodeResult:
+        """Use GitHub MCP provider to fetch repository without cloning."""
+        try:
+            from app.repository import get_repository_provider, GitHubMCPConfig
+            from app.security.repo_content_sanitizer import get_sanitizer
+
+            # Get GitHub token from environment if available
+            import os
+
+            github_token = os.environ.get(
+                "GITHUB_TOKEN", os.environ.get("GITHUB_API_KEY", "")
+            )
+
+            # Create config with token
+            config = GitHubMCPConfig(github_token=github_token)
+
+            # Create the GitHub MCP provider
+            provider = get_repository_provider(
+                "github_mcp",
+                repo_url,
+                config=config,
+            )
+
+            # Check if repository exists
+            if not provider.exists():
+                return NodeResult(
+                    status="failure",
+                    confidence=0.0,
+                    error_type="repo_not_found",
+                    retryable=True,
+                    updates={
+                        "error_state": {
+                            "error_type": "repo_not_found",
+                            "message": "Repository not found on GitHub",
+                        }
+                    },
+                )
+
+            # Get file list
+            files = provider.list_files()
+
+            # Get repository metadata
+            metadata = provider.get_repo_metadata()
+
+            # Prepare metadata
+            repo_metadata = {
+                "provider": "github_mcp",
+                "name": metadata.name,
+                "owner": metadata.owner,
+                "description": metadata.description,
+                "default_branch": metadata.default_branch,
+                "language": metadata.language,
+                "stars": metadata.stars,
+                "forks": metadata.forks,
+                "size_kb": metadata.size_kb,
+                "clone_success": True,
+            }
+
+            updates = {
+                "file_index": sorted(files),
+                "repo_metadata": repo_metadata,
+            }
+
+            return NodeResult(
+                status="success", confidence=0.95, retryable=False, updates=updates
+            )
+
+        except Exception as e:
+            # Fallback to local clone if MCP fails
+            return NodeResult(
+                status="failure",
+                confidence=0.0,
+                error_type="mcp_failed",
+                retryable=True,
+                updates={
+                    "error_state": {
+                        "error_type": "mcp_failed",
+                        "message": f"GitHub MCP failed: {str(e)}. Will fallback to local clone.",
+                    },
+                    "_fallback_mode": True,
                 },
             )
 

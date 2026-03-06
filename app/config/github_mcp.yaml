@@ -1,0 +1,68 @@
+# APRIS GitHub MCP Configuration
+# This file configures how APRIS accesses and analyzes GitHub repositories
+
+github:
+  # GitHub API token (optional, for higher rate limits)
+  # Get from: https://github.com/settings/tokens
+  token: ${GITHUB_TOKEN:}
+  
+  # GitHub MCP Server URL (optional)
+  # If not set, will use direct GitHub API
+  mcp_server_url: ${GITHUB_MCP_SERVER_URL:}
+  
+  # Maximum files to analyze
+  max_files: 200
+  
+  # Maximum file size in KB (files larger than this are skipped)
+  max_file_size_kb: 200
+  
+  # Rate limit - requests per minute (GitHub allows 60 for unauthenticated)
+  rate_limit_per_min: 60
+  
+  # Request timeout in seconds
+  timeout_seconds: 300
+  
+  # Fallback strategy if GitHub MCP/API fails
+  fallback_to_local_clone: true
+
+# Repository provider to use
+# Options: "local", "github_mcp"
+provider: github_mcp
+
+# Performance settings
+performance:
+  # Enable parallel file fetching
+  parallel_fetch: true
+  max_concurrent_files: 10
+  
+  # Enable caching
+  cache_enabled: true
+  cache_ttl_seconds: 3600
+  
+  # File sampling - analyze only important files first
+  sample_important_files: true
+  important_patterns:
+    - "main.py"
+    - "app.py"
+    - "index.js"
+    - "index.ts"
+    - "server.js"
+    - "requirements.txt"
+    - "package.json"
+    - "pyproject.toml"
+    - "Dockerfile"
+    - "docker-compose.yml"
+    - "setup.py"
+    - "build.gradle"
+    - "pom.xml"
+
+# Security settings
+security:
+  # Enable content sanitization
+  sanitize_content: true
+  
+  # Ignore binary files
+  ignore_binary: true
+  
+  # Maximum file size to analyze
+  max_file_size_kb: 200

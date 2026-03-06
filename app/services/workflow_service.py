@@ -29,8 +29,9 @@ class WorkflowService:
         repo_url: str,
         user_id: str,
         mode: str = "deterministic",
-        analysis_mode: str = "deep",
+        analysis_mode: str = "shallow",
         max_files_analyze: int = 50,
+        repository_provider: str = "github_mcp",
     ) -> Dict[str, Any]:
         workflow_id = str(uuid.uuid4())
 
@@ -38,8 +39,9 @@ class WorkflowService:
         initial_state["status"] = "started"
         initial_state["user_id"] = user_id
         initial_state["mode"] = mode
-        initial_state["analysis_mode"] = analysis_mode  # "deep" or "shallow"
-        initial_state["max_files_analyze"] = max_files_analyze  # Max files to analyze
+        initial_state["analysis_mode"] = analysis_mode
+        initial_state["max_files_analyze"] = max_files_analyze
+        initial_state["repository_provider"] = repository_provider
 
         state_json = json.dumps(initial_state)
 

@@ -11,8 +11,9 @@ router = APIRouter(prefix="/workflow", tags=["workflow"])
 class WorkflowStartRequest(BaseModel):
     repo_url: str
     mode: str = "deterministic"
-    analysis_mode: str = "deep"  # "deep" or "shallow"
+    analysis_mode: str = "shallow"  # "deep" or "shallow"
     max_files_analyze: int = 50  # Maximum files to analyze in deep mode
+    repository_provider: str = "github_mcp"  # "github_mcp" or "local"
 
     @validator("repo_url")
     def validate_repo_url(cls, v):
@@ -30,6 +31,12 @@ class WorkflowStartRequest(BaseModel):
     def validate_analysis_mode(cls, v):
         if v not in ["deep", "shallow"]:
             raise ValueError("Analysis mode must be 'deep' or 'shallow'")
+        return v
+
+    @validator("repository_provider")
+    def validate_provider(cls, v):
+        if v not in ["github_mcp", "local"]:
+            raise ValueError("Provider must be 'github_mcp' or 'local'")
         return v
 
 
@@ -78,6 +85,7 @@ async def start_workflow(
         mode=request.mode,
         analysis_mode=request.analysis_mode,
         max_files_analyze=request.max_files_analyze,
+        repository_provider=request.repository_provider,
     )
 
     return WorkflowResponse(**result)
